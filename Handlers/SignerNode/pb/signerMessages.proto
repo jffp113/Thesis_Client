@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package pb;
+
+message ProtocolMessage {
+
+  enum Type {
+    DEFAULT = 0;
+    SIGN_REQUEST = 100;
+    SIGN_RESPONSE = 101;
+  }
+
+  Type type = 1;
+
+  string correlation_id = 2;
+
+  bytes content = 4;
+
+}
+
+message ClientSignMessage{
+  string UUID = 1;
+  string SmartContractAddress = 2;
+  //uint32 t = 3;
+  //uint32 n = 4;
+  //string Scheme = 5;
+  bytes content = 6;
+}
+
+message ClientSignResponse{
+  string scheme = 1;
+  bytes signature = 2;
+}
+
+message SignResponse{
+  string UUID = 1;
+  bytes signature = 2;
+}
+
+
+message ClientVerifyMessage{
+  string Scheme = 1;
+  bytes public_key = 2;
+  bytes digest = 3;
+  bytes signature = 4;
+}
+
+message ClientVerifyResponse{
+  enum Status {
+    STATUS_UNSET = 0;
+    OK = 1;
+    INVALID = 2;
+  }
+
+  Status status = 1;
+}
+
+message MembershipResponse{
+  enum Status {
+    STATUS_UNSET = 0;
+    OK = 1;
+    INVALID = 2;
+  }
+
+  message peer{
+    string id = 1;
+    repeated string addr = 2;
+  }
+
+  Status status = 1;
+  repeated peer peers = 2;
+}
+
+

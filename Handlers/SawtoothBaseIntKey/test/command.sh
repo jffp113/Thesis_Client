@@ -1,0 +1,1 @@
+CGO_CFLAGS="-I/usr/local/opt/openssl/include" CGO_LDFLAGS="-L/usr/local/opt/openssl/lib" go run  main.go -c 1 -a sawtooth
