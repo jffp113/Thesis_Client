@@ -1,13 +1,16 @@
 package Client
 
-import "time"
+import (
+	"github.com/jffp113/Thesis_Client/conf"
+	"time"
+)
 
 //RequestStatus used to return the information of
 // method call from DoRequest
 type RequestStatus struct {
 	StartTime time.Time
-	EndTime time.Time
-	Success bool
+	EndTime   time.Time
+	Success   bool
 }
 
 type StatusPrinter interface {
@@ -25,6 +28,5 @@ type Handler interface {
 	//InitHandler is executed a single time
 	//The Handler should init everything
 	//needed here
-	InitHandler(configFilePath string)
+	InitHandler(config conf.Configuration)
 }
-

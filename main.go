@@ -6,6 +6,7 @@ import (
 	"github.com/jffp113/Thesis_Client/Client"
 	"github.com/jffp113/Thesis_Client/Handlers/SawtoothBaseIntKey"
 	SawtoothExtendedIntKey "github.com/jffp113/Thesis_Client/Handlers/SawtoothExtendedIntKey"
+	"github.com/jffp113/Thesis_Client/Handlers/SignerNode"
 	"github.com/jffp113/Thesis_Client/Handlers/SimpleHttp"
 	"os"
 	"time"
@@ -45,11 +46,18 @@ func main() {
 
 	reqCli := Client.NewRequester()
 	reqCli.SetConcurrentClients(opts.ConcurrentClient)
+	reqCli.SetConfigFilePath("conf.yaml")
 	reqCli.SetDuration(time.Second * time.Duration(opts.Duration))
 
 	reqCli.AddHandler("http", SimpleHttp.NewHandler())
 	reqCli.AddHandler("sawtooth", SawtoothBaseIntKey.NewHandler())
 	reqCli.AddHandler("sawtoothX", SawtoothExtendedIntKey.NewHandler())
-	reqCli.Start(opts.Handler)
+	reqCli.AddHandler("signernode", SignerNode.NewHandler())
+	err = reqCli.Start(opts.Handler)
+
+	if err != nil {
+		fmt.Println("Error: ",err)
+		os.Exit(2)
+	}
 
 }

@@ -6,8 +6,8 @@ package batch_pb2
 import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	math "math"
 	transaction_pb2 "github.com/jffp113/Thesis_Client/Handlers/SawtoothBaseIntKey/protobuf/transaction_pb2"
+	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

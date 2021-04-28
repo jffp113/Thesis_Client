@@ -1,0 +1,7 @@
+conf:
+  signerNodes:
+    - "localhost:8080"
+  validatorNodes:
+    - "localhost:8008"
+  scheme: "TBLS256_5_3"
+  keyPath: "/resources/keys/1/"

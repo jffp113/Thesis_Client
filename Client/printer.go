@@ -6,10 +6,9 @@ import (
 )
 
 type DefaultPrinter struct {
-
 }
 
-func (DefaultPrinter) Print(stats Stats){
+func (DefaultPrinter) Print(stats Stats) {
 	avgDur := stats.TotDuration / time.Duration(stats.ClientsResponses)
 
 	throughput := float64(stats.NumRequests) / avgDur.Seconds()

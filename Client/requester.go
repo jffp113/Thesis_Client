@@ -4,17 +4,18 @@ import (
 	"context"
 	"fmt"
 	"github.com/jffp113/Thesis_Client/Client/util"
+	"github.com/jffp113/Thesis_Client/conf"
 	"time"
 )
 
 type requester struct {
-	duration           	time.Duration //seconds
-	concurrentClients  	int
-	configFilePath 		string
-	handlers 			map[string]Handler
-	ctx					context.Context
-	cancelFunc          context.CancelFunc
-	printer				StatusPrinter
+	duration          time.Duration //seconds
+	concurrentClients int
+	configFilePath    string
+	handlers          map[string]Handler
+	ctx               context.Context
+	cancelFunc        context.CancelFunc
+	printer           StatusPrinter
 }
 
 type Stats struct {
@@ -26,10 +27,10 @@ type Stats struct {
 	ClientsResponses int
 }
 
-func NewRequester() requester{
+func NewRequester() requester {
 	return requester{ctx: context.Background(),
-					printer: DefaultPrinter{},
-					handlers: make(map[string]Handler)}
+		printer:  DefaultPrinter{},
+		handlers: make(map[string]Handler)}
 }
 
 func (r *requester) SetDuration(duration time.Duration) {
@@ -44,29 +45,39 @@ func (r *requester) SetConfigFilePath(path string) {
 	r.configFilePath = path
 }
 
-func (r *requester) AddHandler(key string,handler Handler){
+func (r *requester) AddHandler(key string, handler Handler) {
 	r.handlers[key] = handler
 }
 
-func (r *requester) Start(handlerName string){
-	ctx,cancel := context.WithCancel(r.ctx)
+func (r *requester) Start(handlerName string) error {
+	ctx, cancel := context.WithCancel(r.ctx)
 
 	r.cancelFunc = cancel
 
-	handler,ok := r.handlers[handlerName]
+	handler, ok := r.handlers[handlerName]
 
 	if !ok {
 		panic("Handler Does not exit")
 	}
 
-	handler.InitHandler(r.configFilePath)
+	//parse config file
+	c,err := conf.ParseConfigFile(r.configFilePath)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(c)
+
+	handler.InitHandler(c)
 
 	responseChan := make(chan Stats)
-	for i := 0 ; i < r.concurrentClients; i++{
-		go r.worker(handler,ctx,responseChan)
+	for i := 0; i < r.concurrentClients; i++ {
+		go r.worker(handler, ctx, responseChan)
 	}
 
 	r.aggregateResponses(responseChan)
+	return nil
 }
 
 func (r *requester) Stop() error {
@@ -83,8 +94,8 @@ func (r *requester) aggregateResponses(responseChan <-chan Stats) {
 		aggregatedStats.NumErrs += s.NumErrs
 		aggregatedStats.NumRequests += s.NumRequests
 		aggregatedStats.TotDuration += s.TotDuration
-		aggregatedStats.MaxRequestTime = util.MaxDuration(aggregatedStats.MaxRequestTime,s.MaxRequestTime)
-		aggregatedStats.MinRequestTime = util.MinDuration(aggregatedStats.MinRequestTime,s.MinRequestTime)
+		aggregatedStats.MaxRequestTime = util.MaxDuration(aggregatedStats.MaxRequestTime, s.MaxRequestTime)
+		aggregatedStats.MinRequestTime = util.MinDuration(aggregatedStats.MinRequestTime, s.MinRequestTime)
 		aggregatedStats.ClientsResponses++
 
 		if aggregatedStats.ClientsResponses >= r.concurrentClients {
@@ -95,34 +106,32 @@ func (r *requester) aggregateResponses(responseChan <-chan Stats) {
 	r.printer.Print(aggregatedStats)
 }
 
-
 func (r *requester) worker(handler Handler, ctx context.Context, responseChan chan<- Stats) {
 	stats := Stats{MinRequestTime: time.Hour} //TODO improve Min
 
 	start := time.Now()
 
-
-
 	for {
 		select {
-			case <-ctx.Done():
-				responseChan<-stats
+		case <-ctx.Done():
+			responseChan <- stats
+			fmt.Println("Done")
+			return
+		default:
+			if time.Since(start) > r.duration {
+				responseChan <- stats
 				return
-			default:
-				if time.Since(start) > r.duration {
-					responseChan<-stats
-					return
-				}
+			}
 
-				s := handler.DoRequest()
-				duration := s.EndTime.Sub(s.StartTime)
-				stats.TotDuration += duration
-				stats.MaxRequestTime = util.MaxDuration(stats.MaxRequestTime,duration)
-				stats.MinRequestTime = util.MinDuration(stats.MinRequestTime,duration)
-				stats.NumRequests++
-				if !s.Success {
-					stats.NumErrs++
-				}
+			s := handler.DoRequest()
+			duration := s.EndTime.Sub(s.StartTime)
+			stats.TotDuration += duration
+			stats.MaxRequestTime = util.MaxDuration(stats.MaxRequestTime, duration)
+			stats.MinRequestTime = util.MinDuration(stats.MinRequestTime, duration)
+			stats.NumRequests++
+			if !s.Success {
+				stats.NumErrs++
+			}
 
 		}
 	}

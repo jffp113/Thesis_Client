@@ -27,9 +27,9 @@ import (
 	cbor "github.com/brianolson/cbor_go"
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/sawtooth-sdk-go/signing"
+	"github.com/jffp113/CryptoProviderSDK/keychain"
 	"github.com/jffp113/Thesis_Client/Handlers/SawtoothBaseIntKey/protobuf/transaction_pb2"
 	"github.com/jffp113/Thesis_Client/Handlers/SawtoothExtendedIntKey/pb"
-	"github.com/jffp113/CryptoProviderSDK/keychain"
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -62,11 +62,10 @@ const (
 )
 
 type IntkeyClient struct {
-	url    string
 	signer *signing.Signer
 }
 
-func NewIntkeyClient(url string, keyfile string) (IntkeyClient, error) {
+func NewIntkeyClient(keyfile string) (IntkeyClient, error) {
 
 	var privateKey signing.PrivateKey
 	if keyfile != "" {
@@ -83,30 +82,30 @@ func NewIntkeyClient(url string, keyfile string) (IntkeyClient, error) {
 	}
 	cryptoFactory := signing.NewCryptoFactory(signing.NewSecp256k1Context())
 	signer := cryptoFactory.NewSigner(privateKey)
-	return IntkeyClient{url, signer}, nil
+	return IntkeyClient{signer}, nil
 }
 
 func (intkeyClient IntkeyClient) Set(
-	name string, value uint, wait uint) (string, error) {
-	return intkeyClient.sendTransaction(VERB_SET, name, value, wait)
+	name string, value uint, wait uint, validatorURL string, signerURL string) (string, error) {
+	return intkeyClient.sendTransaction(VERB_SET, name, value, wait, validatorURL, signerURL)
 }
 
 func (intkeyClient IntkeyClient) Inc(
-	name string, value uint, wait uint) (string, error) {
-	return intkeyClient.sendTransaction(VERB_INC, name, value, wait)
+	name string, value uint, wait uint, validatorURL string, signerURL string) (string, error) {
+	return intkeyClient.sendTransaction(VERB_INC, name, value, wait, validatorURL, signerURL)
 }
 
 func (intkeyClient IntkeyClient) Dec(
-	name string, value uint, wait uint) (string, error) {
-	return intkeyClient.sendTransaction(VERB_DEC, name, value, wait)
+	name string, value uint, wait uint, validatorURL string, signerURL string) (string, error) {
+	return intkeyClient.sendTransaction(VERB_DEC, name, value, wait, validatorURL, signerURL)
 }
 
-func (intkeyClient IntkeyClient) List() ([]map[interface{}]interface{}, error) {
+func (intkeyClient IntkeyClient) List(validatorURL string) ([]map[interface{}]interface{}, error) {
 
 	// API to call
 	apiSuffix := fmt.Sprintf("%s?address=%s",
 		STATE_API, intkeyClient.getPrefix())
-	response, err := intkeyClient.sendRequest(apiSuffix, []byte{}, "", "")
+	response, err := intkeyClient.sendRequest(validatorURL, apiSuffix, []byte{}, "", "")
 	if err != nil {
 		return []map[interface{}]interface{}{}, err
 	}
@@ -146,9 +145,9 @@ func (intkeyClient IntkeyClient) List() ([]map[interface{}]interface{}, error) {
 	return toReturn, nil
 }
 
-func (intkeyClient IntkeyClient) Show(name string) (string, error) {
+func (intkeyClient IntkeyClient) Show(name string, validatorURL string) (string, error) {
 	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, intkeyClient.getAddress(name))
-	response, err := intkeyClient.sendRequest(apiSuffix, []byte{}, "", name)
+	response, err := intkeyClient.sendRequest(validatorURL, apiSuffix, []byte{}, "", name)
 	if err != nil {
 		return "", err
 	}
@@ -174,12 +173,12 @@ func (intkeyClient IntkeyClient) Show(name string) (string, error) {
 }
 
 func (intkeyClient IntkeyClient) getStatus(
-	batchId string, wait uint) (string, error) {
+	batchId string, wait uint, validatorURL string) (string, error) {
 
 	// API to call
 	apiSuffix := fmt.Sprintf("%s?id=%s&wait=%d",
 		BATCH_STATUS_API, batchId, wait)
-	response, err := intkeyClient.sendRequest(apiSuffix, []byte{}, "", "")
+	response, err := intkeyClient.sendRequest(validatorURL, apiSuffix, []byte{}, "", "")
 	if err != nil {
 		return "", err
 	}
@@ -195,17 +194,18 @@ func (intkeyClient IntkeyClient) getStatus(
 }
 
 func (intkeyClient IntkeyClient) sendRequest(
+	url string,
 	apiSuffix string,
 	data []byte,
 	contentType string,
 	name string) (string, error) {
 
 	// Construct URL
-	var url string
-	if strings.HasPrefix(intkeyClient.url, "http://") {
-		url = fmt.Sprintf("%s/%s", intkeyClient.url, apiSuffix)
+	//var url string
+	if strings.HasPrefix(url, "http://") {
+		url = fmt.Sprintf("%s/%s", url, apiSuffix)
 	} else {
-		url = fmt.Sprintf("http://%s/%s", intkeyClient.url, apiSuffix)
+		url = fmt.Sprintf("http://%s/%s", url, apiSuffix)
 	}
 
 	// Send request to validator URL
@@ -235,7 +235,7 @@ func (intkeyClient IntkeyClient) sendRequest(
 }
 
 func (intkeyClient IntkeyClient) sendTransaction(
-	verb string, name string, value uint, wait uint) (string, error) {
+	verb string, name string, value uint, wait uint, validatorURL string, signerURL string) (string, error) {
 
 	// construct the payload information in CBOR format
 	payloadData := make(map[string]interface{})
@@ -281,14 +281,12 @@ func (intkeyClient IntkeyClient) sendTransaction(
 
 	// Get BatchList
 	rawBatchList, err := intkeyClient.createBatchList(
-		[]*pb.Transaction{&transaction})
-
+		[]*pb.Transaction{&transaction}, signerURL)
 
 	if err != nil {
 		return "", errors.New(
 			fmt.Sprintf("Unable to construct batch list: %v", err))
 	}
-
 
 	batchId := rawBatchList.Batches[0].HeaderSignature
 	batchList, err := proto.Marshal(&rawBatchList)
@@ -301,12 +299,12 @@ func (intkeyClient IntkeyClient) sendTransaction(
 		waitTime := uint(0)
 		startTime := time.Now()
 		response, err := intkeyClient.sendRequest(
-			BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, name)
+			validatorURL, BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, name)
 		if err != nil {
 			return "", err
 		}
 		for waitTime < wait {
-			status, err := intkeyClient.getStatus(batchId, wait-waitTime)
+			status, err := intkeyClient.getStatus(batchId, wait-waitTime, validatorURL)
 			if err != nil {
 				return "", err
 			}
@@ -319,7 +317,7 @@ func (intkeyClient IntkeyClient) sendTransaction(
 	}
 
 	return intkeyClient.sendRequest(
-		BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, name)
+		validatorURL, BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, name)
 }
 
 func (intkeyClient IntkeyClient) getPrefix() string {
@@ -333,7 +331,7 @@ func (intkeyClient IntkeyClient) getAddress(name string) string {
 }
 
 func (intkeyClient IntkeyClient) createBatchList(
-	transactions []*pb.Transaction) (pb.BatchList, error) {
+	transactions []*pb.Transaction, signerURL string) (pb.BatchList, error) {
 
 	// Get list of TransactionHeader signatures
 	transactionSignatures := []string{}
@@ -343,35 +341,35 @@ func (intkeyClient IntkeyClient) createBatchList(
 	}
 
 	kc := keychain.NewKeyChain("./resources/keys/1/")
-	pubKey,err := kc.LoadPublicKey("TBLS256_5_3")
+	pubKey, err := kc.LoadPublicKey("TBLS256_5_3")
 
 	if err != nil {
-		return pb.BatchList{},err
+		return pb.BatchList{}, err
 	}
 
-	pubKeyBytes,_ := pubKey.MarshalBinary()
+	pubKeyBytes, _ := pubKey.MarshalBinary()
 
 	transactionList := pb.TransactionList{}
 	transactionList.Transactions = transactions
-	toSignBytes,_ := proto.Marshal(&transactionList)
+	toSignBytes, _ := proto.Marshal(&transactionList)
 
-	sig,scheme,err := performGroupSignature(toSignBytes)
+	sig, scheme, err := performGroupSignature(toSignBytes, signerURL)
 
 	if err != nil {
-		return pb.BatchList{},err
+		return pb.BatchList{}, err
 	}
 
 	groupEnvelop := pb.GroupEnvelop{}
 	groupEnvelop.PublicKey = pubKeyBytes
 	groupEnvelop.Scheme = scheme
 	groupEnvelop.Signature = sig
-	groupEnvelopBytes , err := proto.Marshal(&groupEnvelop)
+	groupEnvelopBytes, err := proto.Marshal(&groupEnvelop)
 
 	// Construct BatchHeader
 	rawBatchHeader := pb.BatchHeader{
 		SignerPublicKey: intkeyClient.signer.GetPublicKey().AsHex(),
 		TransactionIds:  transactionSignatures,
-		GroupEnvelop: groupEnvelopBytes,
+		GroupEnvelop:    groupEnvelopBytes,
 	}
 	batchHeader, err := proto.Marshal(&rawBatchHeader)
 	if err != nil {
@@ -385,12 +383,11 @@ func (intkeyClient IntkeyClient) createBatchList(
 
 	// Construct Batch
 	batch := pb.Batch{
-		Header:               batchHeader,
-		HeaderSignature:      batchHeaderSignature,
-		Transactions:         transactions,
-		Trace:                true,
+		Header:          batchHeader,
+		HeaderSignature: batchHeaderSignature,
+		Transactions:    transactions,
+		Trace:           true,
 	}
-
 
 	// Construct BatchList
 	return pb.BatchList{
@@ -398,32 +395,33 @@ func (intkeyClient IntkeyClient) createBatchList(
 	}, nil
 }
 
-func performGroupSignature(content []byte) ([]byte,string,error) {
+func performGroupSignature(content []byte, signerURL string) ([]byte, string, error) {
 
 	uuid := fmt.Sprint(uuid.NewV4())
-	msg:=pb.ClientSignMessage{
-		UUID:          fmt.Sprint(uuid),
-		Content:       content,
+	msg := pb.ClientSignMessage{
+		UUID:                 fmt.Sprint(uuid),
+		Content:              content,
 		SmartContractAddress: "intkey",
 	}
 
-	b,err := proto.Marshal(&msg)
+	b, err := proto.Marshal(&msg)
 
 	reader := bytes.NewReader(b)
 
-	resp, err := http.Post("http://localhost:8080/sign","application/protobuf",reader)
+	//TODO change
+	resp, err := http.Post(fmt.Sprintf("http://%v/sign", signerURL), "application/protobuf", reader)
 
-	if err != nil{
-		return nil,"",err
+	if err != nil {
+		return nil, "", err
 	}
 
 	//fmt.Println(resp)
-	body,_ :=ioutil.ReadAll(resp.Body)
+	body, _ := ioutil.ReadAll(resp.Body)
 
 	respProto := pb.ClientSignResponse{}
-	proto.Unmarshal(body,&respProto)
+	proto.Unmarshal(body, &respProto)
 
-	return respProto.Signature,respProto.Scheme,err
+	return respProto.Signature, respProto.Scheme, err
 }
 
 func Sha512HashValue(value string) string {
