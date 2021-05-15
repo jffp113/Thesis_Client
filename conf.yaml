@@ -1,7 +1,22 @@
 conf:
   signerNodes:
     - "localhost:8080"
+    - "localhost:8081"
+    - "localhost:8082"
+    - "localhost:8083"
+    - "localhost:8084"
   validatorNodes:
-    - "localhost:8008"
-  scheme: "TBLS256_5_3"
-  keyPath: "/resources/keys/1/"
+    - "localhost:4004"
+  keyName: "TBLS256_5_3"
+  keyPath: "./resources/keys/1/"
+
+  token: 245d2a90708515c967f1b87dcc7d31951eb15a5d46199865a36e1f0a42db7662
+
+  #SignerNode permissionless Settings
+  isPermissionless: true
+  isOneTimeKey: false
+  isGrupoRandomGenerated: true
+  sendSignatureToAlgorand: false #Incorporated in signernode handler
+  n: 5
+  t: 3
+  scheme: "TBLS256"

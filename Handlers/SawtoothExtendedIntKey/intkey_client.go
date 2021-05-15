@@ -28,9 +28,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/sawtooth-sdk-go/signing"
 	"github.com/jffp113/CryptoProviderSDK/keychain"
+	"github.com/jffp113/SignerNode_Thesis/client"
 	"github.com/jffp113/Thesis_Client/Handlers/SawtoothBaseIntKey/protobuf/transaction_pb2"
 	"github.com/jffp113/Thesis_Client/Handlers/SawtoothExtendedIntKey/pb"
-	uuid "github.com/satori/go.uuid"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"math/rand"
@@ -62,10 +62,12 @@ const (
 )
 
 type IntkeyClient struct {
-	signer *signing.Signer
+	signer  *signing.Signer
+	keyPath string
+	keyName string
 }
 
-func NewIntkeyClient(keyfile string) (IntkeyClient, error) {
+func NewIntkeyClient(keyfile string, keyPath string, keyName string) (IntkeyClient, error) {
 
 	var privateKey signing.PrivateKey
 	if keyfile != "" {
@@ -82,7 +84,7 @@ func NewIntkeyClient(keyfile string) (IntkeyClient, error) {
 	}
 	cryptoFactory := signing.NewCryptoFactory(signing.NewSecp256k1Context())
 	signer := cryptoFactory.NewSigner(privateKey)
-	return IntkeyClient{signer}, nil
+	return IntkeyClient{signer, keyPath, keyName}, nil
 }
 
 func (intkeyClient IntkeyClient) Set(
@@ -340,8 +342,8 @@ func (intkeyClient IntkeyClient) createBatchList(
 			append(transactionSignatures, transaction.HeaderSignature)
 	}
 
-	kc := keychain.NewKeyChain("./resources/keys/1/")
-	pubKey, err := kc.LoadPublicKey("TBLS256_5_3")
+	kc := keychain.NewKeyChain(intkeyClient.keyPath)      //e.g "./resources/keys/1/"
+	pubKey, err := kc.LoadPublicKey(intkeyClient.keyName) //e.g "TBLS256_5_3"
 
 	if err != nil {
 		return pb.BatchList{}, err
@@ -396,32 +398,15 @@ func (intkeyClient IntkeyClient) createBatchList(
 }
 
 func performGroupSignature(content []byte, signerURL string) ([]byte, string, error) {
-
-	uuid := fmt.Sprint(uuid.NewV4())
-	msg := pb.ClientSignMessage{
-		UUID:                 fmt.Sprint(uuid),
-		Content:              content,
-		SmartContractAddress: "intkey",
-	}
-
-	b, err := proto.Marshal(&msg)
-
-	reader := bytes.NewReader(b)
-
-	//TODO change
-	resp, err := http.Post(fmt.Sprintf("http://%v/sign", signerURL), "application/protobuf", reader)
+	c ,err := client.NewPermissionedClient(client.SetSignerNodeAddresses(signerURL))
 
 	if err != nil {
-		return nil, "", err
+		return nil,"",err
 	}
 
-	//fmt.Println(resp)
-	body, _ := ioutil.ReadAll(resp.Body)
+	resp, err := c.SendSignRequest(content,"intkey")
 
-	respProto := pb.ClientSignResponse{}
-	proto.Unmarshal(body, &respProto)
-
-	return respProto.Signature, respProto.Scheme, err
+	return resp.Signature, resp.Scheme, err
 }
 
 func Sha512HashValue(value string) string {

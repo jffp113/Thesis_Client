@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/jessevdk/go-flags"
 	"github.com/jffp113/Thesis_Client/Client"
+	"github.com/jffp113/Thesis_Client/Handlers/Algorand"
 	"github.com/jffp113/Thesis_Client/Handlers/SawtoothBaseIntKey"
 	SawtoothExtendedIntKey "github.com/jffp113/Thesis_Client/Handlers/SawtoothExtendedIntKey"
 	"github.com/jffp113/Thesis_Client/Handlers/SignerNode"
@@ -53,10 +54,11 @@ func main() {
 	reqCli.AddHandler("sawtooth", SawtoothBaseIntKey.NewHandler())
 	reqCli.AddHandler("sawtoothX", SawtoothExtendedIntKey.NewHandler())
 	reqCli.AddHandler("signernode", SignerNode.NewHandler())
+	reqCli.AddHandler("algorand", Algorand.NewHandler())
 	err = reqCli.Start(opts.Handler)
 
 	if err != nil {
-		fmt.Println("Error: ",err)
+		fmt.Println("Error: ", err)
 		os.Exit(2)
 	}
 

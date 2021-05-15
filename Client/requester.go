@@ -61,7 +61,7 @@ func (r *requester) Start(handlerName string) error {
 	}
 
 	//parse config file
-	c,err := conf.ParseConfigFile(r.configFilePath)
+	c, err := conf.ParseConfigFile(r.configFilePath)
 
 	if err != nil {
 		return err
